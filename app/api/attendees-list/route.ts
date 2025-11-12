@@ -107,7 +107,7 @@ export async function GET() {
         ag.event_attendee_id,
         ag.seat_id,
         ag.seat_obj,
-        ag.checkin_timestamp
+        to_char((ag.checkin_timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'America/Chicago', 'MM/DD/YYYY, HH12:MI:SS AM') as checkin_timestamp
       FROM attendee_guests ag
       WHERE ag.event_attendee_id = ANY($1)
       ORDER BY ag.event_attendee_id, ag.id
@@ -216,6 +216,7 @@ export async function GET() {
         ? `${row.first_name} ${row.last_name}`
         : row.first_name || row.last_name || "Unknown";
 
+      // Timestamp is already formatted as a string by PostgreSQL
       return {
         attendeeName: attendeeName,
         seatInfo: seatInfo,

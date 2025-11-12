@@ -48,18 +48,9 @@ export default function Home() {
 
 
   const formatDateTime = (dateString: string | null) => {
+    // The timestamp is already formatted in CST on the server side
     if (!dateString) return "-";
-
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
+    return dateString;
   };
 
   return (
