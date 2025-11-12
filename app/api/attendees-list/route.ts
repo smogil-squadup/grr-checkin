@@ -110,7 +110,7 @@ export async function GET() {
         ag.checkin_timestamp
       FROM attendee_guests ag
       WHERE ag.event_attendee_id = ANY($1)
-      LIMIT 100
+      ORDER BY ag.event_attendee_id, ag.id
     `;
 
     const seatStart = Date.now();
@@ -128,13 +128,27 @@ export async function GET() {
     }
 
     // Log all attendees to see what we're working with
-    console.log(`\nAttendee breakdown:`);
-    for (const attendee of attendeeResults) {
+    console.log(`\nAttendee breakdown (first 10):`);
+    for (const attendee of attendeeResults.slice(0, 10)) {
       const seats = seatResults.filter(s => s.event_attendee_id === attendee.id);
       console.log(`  - Attendee ${attendee.id} (${attendee.first_name} ${attendee.last_name}): ${seats.length} seat(s)`);
       seats.forEach((seat, idx) => {
         console.log(`    Seat ${idx + 1}: seat_id="${seat.seat_id}", has seat_obj: ${!!seat.seat_obj}`);
       });
+    }
+
+    // Check for the specific attendee mentioned (Kizzie Mason-Cokrell, ID 8318894)
+    const kizzieAttendee = attendeeResults.find(a => a.id === 8318894);
+    if (kizzieAttendee) {
+      const kizzieSeats = seatResults.filter(s => s.event_attendee_id === 8318894);
+      console.log(`\n*** Special check for Kizzie Mason-Cokrell (ID 8318894): ${kizzieSeats.length} seat(s) found`);
+      if (kizzieSeats.length > 0) {
+        kizzieSeats.forEach((seat, idx) => {
+          console.log(`  Seat ${idx + 1}:`, JSON.stringify(seat, null, 2));
+        });
+      }
+    } else {
+      console.log(`\n*** Kizzie Mason-Cokrell (ID 8318894) NOT in attendeeResults`);
     }
 
     // Combine the results - CREATE ONE ROW PER SEAT (not per attendee)
