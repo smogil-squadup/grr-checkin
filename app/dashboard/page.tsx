@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 interface AttendeeResult {
   attendeeName: string;
+  eventName: string;
   seatInfo: string | null;
   validatedAt: string | null;
 }
@@ -128,6 +129,9 @@ export default function Home() {
                   Attendee Name
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                  Event Name
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
                   Seat ID
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
@@ -138,7 +142,7 @@ export default function Home() {
             <tbody className="divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center">
+                  <td colSpan={4} className="px-6 py-12 text-center">
                     <div className="flex items-center justify-center gap-2 text-gray-500">
                       <Loader2 className="animate-spin" size={24} />
                       <span>Loading attendees...</span>
@@ -147,7 +151,7 @@ export default function Home() {
                 </tr>
               ) : results.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
                     No attendees found
                   </td>
                 </tr>
@@ -156,6 +160,9 @@ export default function Home() {
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       {result.attendeeName}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">
+                      {result.eventName}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">
                       {result.seatInfo || "-"}

@@ -162,6 +162,8 @@ export async function GET(request: NextRequest) {
     const results: Array<{
       first_name: string | null;
       last_name: string | null;
+      event_id: number;
+      event_name: string;
       seat_id: string | null;
       seat_obj: AttendeeRow['seat_obj'];
       checkin_timestamp: string | null;
@@ -169,12 +171,15 @@ export async function GET(request: NextRequest) {
 
     for (const attendee of attendeeResults) {
       const seats = seatResults.filter(s => s.event_attendee_id === attendee.id);
+      const eventInfo = eventResult.find(e => e.id === attendee.event_id);
 
       if (seats.length === 0) {
         // Attendee has no seats, show them with null seat info
         results.push({
           first_name: attendee.first_name,
           last_name: attendee.last_name,
+          event_id: attendee.event_id,
+          event_name: eventInfo?.name || `Event #${attendee.event_id}`,
           seat_id: null,
           seat_obj: null,
           checkin_timestamp: null,
@@ -185,6 +190,8 @@ export async function GET(request: NextRequest) {
           results.push({
             first_name: attendee.first_name,
             last_name: attendee.last_name,
+            event_id: attendee.event_id,
+            event_name: eventInfo?.name || `Event #${attendee.event_id}`,
             seat_id: seat.seat_id,
             seat_obj: seat.seat_obj,
             checkin_timestamp: seat.checkin_timestamp,
@@ -226,6 +233,7 @@ export async function GET(request: NextRequest) {
       // Timestamp is already formatted as a string by PostgreSQL
       return {
         attendeeName: attendeeName,
+        eventName: row.event_name,
         seatInfo: seatInfo,
         validatedAt: row.checkin_timestamp,
       };
