@@ -153,12 +153,16 @@ export async function GET(request: NextRequest) {
       console.log(`  Row ${idx + 1}: name="${r.first_name} ${r.last_name}", seat_id="${r.seat_id}"`);
     });
 
-    // Transform results to extract seat info from seat_obj if available
+    // Transform results to extract seat info from seat_id (preferred format)
     const transformedResults = results.map((row) => {
       let seatInfo: string | null = null;
 
-      // Try to extract from seat_obj.components first
-      if (
+      // Use seat_id as the primary format (e.g., "CAR 4-Seat 25")
+      if (row.seat_id) {
+        seatInfo = row.seat_id;
+      }
+      // Fallback to seat_obj.components only if seat_id is not available
+      else if (
         row.seat_obj?.components &&
         Array.isArray(row.seat_obj.components) &&
         row.seat_obj.components.length > 0
@@ -166,10 +170,6 @@ export async function GET(request: NextRequest) {
         seatInfo = row.seat_obj.components
           .map((comp) => `${comp.label}: ${comp.value}`)
           .join(", ");
-      }
-      // Fallback to seat_id if seat_obj is empty or null
-      else if (row.seat_id) {
-        seatInfo = row.seat_id;
       }
 
       // Construct attendee name from first_name and last_name
