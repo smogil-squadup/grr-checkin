@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { Loader2, RefreshCw, CalendarIcon, Users } from "lucide-react";
+import { Loader2, RefreshCw, CalendarIcon, Users, Search } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 interface AttendeeResult {
@@ -27,6 +28,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchAttendees = async (date: Date) => {
     setIsLoading(true);
@@ -73,8 +75,14 @@ export default function Home() {
     return dateString;
   };
 
-  // Group results by event start time
-  const groupedEvents: GroupedEvent[] = results.reduce((acc: GroupedEvent[], result) => {
+  // Filter results based on search query
+  const filteredResults = results.filter(result => {
+    if (!searchQuery.trim()) return true;
+    return result.attendeeName.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  // Group filtered results by event start time
+  const groupedEvents: GroupedEvent[] = filteredResults.reduce((acc: GroupedEvent[], result) => {
     const existingEvent = acc.find(e => e.eventStartTime === result.eventStartTime);
     if (existingEvent) {
       existingEvent.attendees.push(result);
@@ -86,6 +94,14 @@ export default function Home() {
     }
     return acc;
   }, []);
+
+  // Sort events chronologically (earliest to latest)
+  groupedEvents.sort((a, b) => {
+    // Parse the formatted time string "MM/DD/YYYY, HH12:MI AM" back to Date
+    const dateA = new Date(a.eventStartTime);
+    const dateB = new Date(b.eventStartTime);
+    return dateA.getTime() - dateB.getTime();
+  });
 
   return (
     <main className="min-h-screen p-8 max-w-7xl mx-auto">
@@ -155,6 +171,31 @@ export default function Home() {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="bg-white border rounded-lg shadow-sm px-6 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <Input
+                type="text"
+                placeholder="Search attendees by name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-full"
+              />
+            </div>
+            {searchQuery && (
+              <p className="text-sm text-gray-600 mt-2">
+                Found {filteredResults.length} attendee{filteredResults.length !== 1 ? "s" : ""} matching "{searchQuery}"
+              </p>
+            )}
+          </div>
+
+          {filteredResults.length === 0 ? (
+            <div className="bg-white border rounded-lg shadow-sm p-12 text-center text-gray-500">
+              No attendees found matching "{searchQuery}"
+            </div>
+          ) : (
+            <div className="space-y-4">
           <Accordion type="single" collapsible defaultValue="event-0" className="space-y-4">
             {groupedEvents.map((event, eventIdx) => (
               <AccordionItem
@@ -216,9 +257,15 @@ export default function Home() {
 
           <div className="bg-white border rounded-lg shadow-sm px-6 py-3">
             <p className="text-sm text-gray-600">
-              Total: {results.length} attendee{results.length !== 1 ? "s" : ""} across {groupedEvents.length} event{groupedEvents.length !== 1 ? "s" : ""}
+              {searchQuery ? (
+                <>Showing {filteredResults.length} of {results.length} attendee{results.length !== 1 ? "s" : ""} across {groupedEvents.length} event{groupedEvents.length !== 1 ? "s" : ""}</>
+              ) : (
+                <>Total: {results.length} attendee{results.length !== 1 ? "s" : ""} across {groupedEvents.length} event{groupedEvents.length !== 1 ? "s" : ""}</>
+              )}
             </p>
           </div>
+            </div>
+          )}
         </div>
       )}
     </main>
