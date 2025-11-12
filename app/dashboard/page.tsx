@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { Loader2, RefreshCw, CalendarIcon, Users, Search } from "lucide-react";
 import { format } from "date-fns";
@@ -185,14 +185,14 @@ export default function Home() {
             </div>
             {searchQuery && (
               <p className="text-sm text-gray-600 mt-2">
-                Found {filteredResults.length} attendee{filteredResults.length !== 1 ? "s" : ""} matching "{searchQuery}"
+                Found {filteredResults.length} attendee{filteredResults.length !== 1 ? "s" : ""} matching &quot;{searchQuery}&quot;
               </p>
             )}
           </div>
 
           {filteredResults.length === 0 ? (
             <div className="bg-white border rounded-lg shadow-sm p-12 text-center text-gray-500">
-              No attendees found matching "{searchQuery}"
+              No attendees found matching &quot;{searchQuery}&quot;
             </div>
           ) : (
             <div className="space-y-4">
