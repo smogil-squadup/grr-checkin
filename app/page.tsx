@@ -30,7 +30,7 @@ export default function Home() {
               <Lock className="w-8 h-8 text-blue-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Gotham Seat Lookup
+              GRR Checkin Lookup
             </h1>
             <p className="text-gray-600">Event Attendee Search Tool</p>
           </div>
