@@ -20,6 +20,7 @@ export default function Home() {
   const [results, setResults] = useState<AttendeeResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const fetchAttendees = async (date: Date) => {
     setIsLoading(true);
@@ -54,6 +55,7 @@ export default function Home() {
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
+      setCalendarOpen(false); // Close the calendar popover
       fetchAttendees(date);
     }
   };
@@ -78,7 +80,7 @@ export default function Home() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Popover>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
