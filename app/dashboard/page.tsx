@@ -81,7 +81,7 @@ export default function Home() {
     return result.attendeeName.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  // Group filtered results by event start time
+  // Group filtered results by event start time and sort attendees by seat ID
   const groupedEvents: GroupedEvent[] = filteredResults.reduce((acc: GroupedEvent[], result) => {
     const existingEvent = acc.find(e => e.eventStartTime === result.eventStartTime);
     if (existingEvent) {
@@ -94,6 +94,32 @@ export default function Home() {
     }
     return acc;
   }, []);
+
+  // Sort attendees within each event by seat ID
+  groupedEvents.forEach(event => {
+    event.attendees.sort((a, b) => {
+      // Extract car and seat/table numbers from seat ID format "CAR X-Seat Y" or "CAR X-Table Y"
+      const parseSeatId = (seatInfo: string | null) => {
+        if (!seatInfo) return { car: Infinity, seat: Infinity }; // Put nulls at the end
+
+        // Handle both "Seat" and "Table" formats
+        const match = seatInfo.match(/CAR\s*(\d+)\s*-?\s*(Seat|Table)\s+(\d+)/i);
+        if (match) {
+          return { car: parseInt(match[1], 10), seat: parseInt(match[3], 10) };
+        }
+        return { car: Infinity, seat: Infinity }; // Put non-matching formats at the end
+      };
+
+      const seatA = parseSeatId(a.seatInfo);
+      const seatB = parseSeatId(b.seatInfo);
+
+      // Sort by car first, then by seat/table number
+      if (seatA.car !== seatB.car) {
+        return seatA.car - seatB.car;
+      }
+      return seatA.seat - seatB.seat;
+    });
+  });
 
   // Sort events chronologically (earliest to latest)
   groupedEvents.sort((a, b) => {
