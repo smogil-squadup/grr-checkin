@@ -49,7 +49,12 @@ export async function GET(request: NextRequest) {
     // Step 2: Get all POLAR EXPRESS events (exclude parking) for the selected date
     console.log("Step 2: Finding POLAR EXPRESS events with attendees...");
     const eventQuery = `
-      SELECT DISTINCT e.id, e.name, e.start_at, COUNT(ea.id) as attendee_count
+      SELECT DISTINCT
+        e.id,
+        e.name,
+        e.start_at,
+        to_char((e.start_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Chicago', 'MM/DD/YYYY, HH12:MI AM') as start_at_formatted,
+        COUNT(ea.id) as attendee_count
       FROM events e
       INNER JOIN event_attendees ea ON ea.event_id = e.id
       WHERE e.user_id = $1
@@ -63,7 +68,7 @@ export async function GET(request: NextRequest) {
     `;
 
     const eventParams = dateParam ? [HOST_USER_ID, dateParam] : [HOST_USER_ID];
-    const eventResult = await query<{ id: number; name: string; start_at: string; attendee_count: number }>(eventQuery, eventParams);
+    const eventResult = await query<{ id: number; name: string; start_at: string; start_at_formatted: string; attendee_count: number }>(eventQuery, eventParams);
     if (eventResult.length === 0) {
       console.log("No POLAR EXPRESS events with attendees found for this host");
       return NextResponse.json({ results: [], metadata: { hostUserId: HOST_USER_ID, total: 0 } });
@@ -163,7 +168,7 @@ export async function GET(request: NextRequest) {
       first_name: string | null;
       last_name: string | null;
       event_id: number;
-      event_name: string;
+      event_start_at_formatted: string;
       seat_id: string | null;
       seat_obj: AttendeeRow['seat_obj'];
       checkin_timestamp: string | null;
@@ -179,7 +184,7 @@ export async function GET(request: NextRequest) {
           first_name: attendee.first_name,
           last_name: attendee.last_name,
           event_id: attendee.event_id,
-          event_name: eventInfo?.name || `Event #${attendee.event_id}`,
+          event_start_at_formatted: eventInfo?.start_at_formatted || '-',
           seat_id: null,
           seat_obj: null,
           checkin_timestamp: null,
@@ -191,7 +196,7 @@ export async function GET(request: NextRequest) {
             first_name: attendee.first_name,
             last_name: attendee.last_name,
             event_id: attendee.event_id,
-            event_name: eventInfo?.name || `Event #${attendee.event_id}`,
+            event_start_at_formatted: eventInfo?.start_at_formatted || '-',
             seat_id: seat.seat_id,
             seat_obj: seat.seat_obj,
             checkin_timestamp: seat.checkin_timestamp,
@@ -230,10 +235,13 @@ export async function GET(request: NextRequest) {
         ? `${row.first_name} ${row.last_name}`
         : row.first_name || row.last_name || "Unknown";
 
+      // Event start time is already formatted by PostgreSQL with timezone conversion
+      const eventStartTime = row.event_start_at_formatted || "-";
+
       // Timestamp is already formatted as a string by PostgreSQL
       return {
+        eventStartTime: eventStartTime,
         attendeeName: attendeeName,
-        eventName: row.event_name,
         seatInfo: seatInfo,
         validatedAt: row.checkin_timestamp,
       };

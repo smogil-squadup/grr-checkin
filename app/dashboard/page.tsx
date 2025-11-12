@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface AttendeeResult {
+  eventStartTime: string;
   attendeeName: string;
-  eventName: string;
   seatInfo: string | null;
   validatedAt: string | null;
 }
@@ -126,10 +126,10 @@ export default function Home() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                  Attendee Name
+                  Event Start Time
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                  Event Name
+                  Attendee Name
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
                   Seat ID
@@ -158,11 +158,11 @@ export default function Home() {
               ) : (
                 results.map((result, idx) => (
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-sm text-gray-700">
+                      {result.eventStartTime}
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       {result.attendeeName}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {result.eventName}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">
                       {result.seatInfo || "-"}
