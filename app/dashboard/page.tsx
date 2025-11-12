@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface AttendeeResult {
   attendeeName: string;
@@ -13,15 +18,17 @@ interface AttendeeResult {
 export default function Home() {
   const [results, setResults] = useState<AttendeeResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const fetchAttendees = async () => {
+  const fetchAttendees = async (date: Date) => {
     setIsLoading(true);
     setResults([]);
 
     toast.loading("Loading attendees...", { id: "fetch" });
 
     try {
-      const response = await fetch("/api/attendees-list");
+      const formattedDate = format(date, "yyyy-MM-dd");
+      const response = await fetch(`/api/attendees-list?date=${formattedDate}`);
 
       const data = await response.json();
 
@@ -41,10 +48,14 @@ export default function Home() {
     }
   };
 
-  // Fetch attendees on component mount
-  useEffect(() => {
-    fetchAttendees();
-  }, []);
+  // Don't fetch on mount - only when user clicks refresh or selects a date
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+      fetchAttendees(date);
+    }
+  };
 
 
   const formatDateTime = (dateString: string | null) => {
@@ -65,22 +76,46 @@ export default function Home() {
               View all attendees with their seat assignments and validation status
             </p>
           </div>
-          <button
-            onClick={fetchAttendees}
-            disabled={isLoading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
-            {isLoading ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                Loading...
-              </>
-            ) : (
-              <>
-                <RefreshCw size={20} />
-                Refresh
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <button
+              onClick={() => fetchAttendees(selectedDate)}
+              disabled={isLoading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+              {isLoading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={20} />
+                  Refresh
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

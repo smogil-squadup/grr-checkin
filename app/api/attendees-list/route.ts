@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { query } from "@/lib/db";
 
 const HOST_USER_ID = 9835080;
@@ -16,10 +17,14 @@ interface AttendeeRow {
   checkin_timestamp: string | null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const dateParam = searchParams.get("date");
+
     console.log("=".repeat(50));
     console.log("API CALL RECEIVED - Fetching attendees list for host user:", HOST_USER_ID);
+    console.log("Date filter:", dateParam);
     console.log("=".repeat(50));
 
     // ULTRA SIMPLE TEST: Just get a count of events for this host
@@ -41,7 +46,7 @@ export async function GET() {
       throw err;
     }
 
-    // Step 2: Get all POLAR EXPRESS events (exclude parking)
+    // Step 2: Get all POLAR EXPRESS events (exclude parking) for the selected date
     console.log("Step 2: Finding POLAR EXPRESS events with attendees...");
     const eventQuery = `
       SELECT DISTINCT e.id, e.name, e.start_at, COUNT(ea.id) as attendee_count
@@ -51,12 +56,14 @@ export async function GET() {
         AND ea.deleted_at IS NULL
         AND UPPER(e.name) LIKE '%POLAR EXPRESS%'
         AND UPPER(e.name) NOT LIKE '%PARKING%'
+        ${dateParam ? "AND ((e.start_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Chicago')::date = $2::date" : ""}
       GROUP BY e.id, e.name, e.start_at
       HAVING COUNT(ea.id) > 0
       ORDER BY e.start_at DESC
     `;
 
-    const eventResult = await query<{ id: number; name: string; start_at: string; attendee_count: number }>(eventQuery, [HOST_USER_ID]);
+    const eventParams = dateParam ? [HOST_USER_ID, dateParam] : [HOST_USER_ID];
+    const eventResult = await query<{ id: number; name: string; start_at: string; attendee_count: number }>(eventQuery, eventParams);
     if (eventResult.length === 0) {
       console.log("No POLAR EXPRESS events with attendees found for this host");
       return NextResponse.json({ results: [], metadata: { hostUserId: HOST_USER_ID, total: 0 } });
