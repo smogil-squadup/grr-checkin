@@ -81,89 +81,51 @@ export async function GET(request: NextRequest) {
       console.log(`  - Event ${e.id}: "${e.name}" (${e.attendee_count} attendees)`);
     });
 
-    // Step 3: Get attendees from ALL matching events
-    const queryText = `
+    // Step 3: Combine attendees and seats in a SINGLE query with JOIN
+    // This is much faster than two separate queries
+    console.log(`Step 3: Getting attendees and seats from ${eventIds.length} event(s) in one query...`);
+    const startTime = Date.now();
+
+    const combinedQuery = `
       SELECT
-        ea.id,
+        ea.id as attendee_id,
         ea.first_name,
         ea.last_name,
-        ea.event_id
-      FROM event_attendees ea
-      WHERE ea.event_id = ANY($1)
-        AND ea.deleted_at IS NULL
-      ORDER BY ea.event_id DESC, ea.id DESC
-      LIMIT 10000
-    `;
-
-    console.log(`Step 3: Getting attendees from ${eventIds.length} event(s)...`);
-    const startTime = Date.now();
-    const attendeeResults = await query<{
-      id: number;
-      first_name: string | null;
-      last_name: string | null;
-      event_id: number;
-    }>(queryText, [eventIds]);
-    const duration = Date.now() - startTime;
-    console.log(`Step 3 COMPLETE in ${duration}ms. Found ${attendeeResults.length} attendee records`);
-
-    // Step 4: Now get seat info for just these attendees
-    if (attendeeResults.length === 0) {
-      return NextResponse.json({ results: [], metadata: { hostUserId: HOST_USER_ID, total: 0 } });
-    }
-
-    const attendeeIds = attendeeResults.map(a => a.id);
-    console.log(`Step 4: Getting seat info for ${attendeeIds.length} attendees...`);
-
-    const seatQuery = `
-      SELECT
-        ag.event_attendee_id,
+        ea.event_id,
         ag.seat_id,
         ag.seat_obj,
         to_char((ag.checkin_timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'America/Chicago', 'MM/DD/YYYY, HH12:MI:SS AM') as checkin_timestamp
-      FROM attendee_guests ag
-      WHERE ag.event_attendee_id = ANY($1)
-      ORDER BY ag.event_attendee_id, ag.id
+      FROM event_attendees ea
+      LEFT JOIN attendee_guests ag ON ag.event_attendee_id = ea.id
+      WHERE ea.event_id = ANY($1)
+        AND ea.deleted_at IS NULL
+      ORDER BY ea.event_id DESC, ea.id DESC, ag.id
+      LIMIT 10000
     `;
 
-    const seatStart = Date.now();
-    const seatResults = await query<{
-      event_attendee_id: number;
+    const combinedResults = await query<{
+      attendee_id: number;
+      first_name: string | null;
+      last_name: string | null;
+      event_id: number;
       seat_id: string | null;
       seat_obj: AttendeeRow['seat_obj'];
       checkin_timestamp: string | null;
-    }>(seatQuery, [attendeeIds]);
-    console.log(`Step 4 COMPLETE in ${Date.now() - seatStart}ms. Found ${seatResults.length} seat records`);
+    }>(combinedQuery, [eventIds]);
 
-    // Log first seat to see structure
-    if (seatResults.length > 0) {
-      console.log("Sample seat data:", JSON.stringify(seatResults[0], null, 2));
+    const duration = Date.now() - startTime;
+    console.log(`Step 3 COMPLETE in ${duration}ms. Found ${combinedResults.length} combined records`);
+
+    if (combinedResults.length === 0) {
+      return NextResponse.json({ results: [], metadata: { hostUserId: HOST_USER_ID, total: 0 } });
     }
 
-    // Log all attendees to see what we're working with
-    console.log(`\nAttendee breakdown (first 10):`);
-    for (const attendee of attendeeResults.slice(0, 10)) {
-      const seats = seatResults.filter(s => s.event_attendee_id === attendee.id);
-      console.log(`  - Attendee ${attendee.id} (${attendee.first_name} ${attendee.last_name}): ${seats.length} seat(s)`);
-      seats.forEach((seat, idx) => {
-        console.log(`    Seat ${idx + 1}: seat_id="${seat.seat_id}", has seat_obj: ${!!seat.seat_obj}`);
-      });
+    // Log sample data
+    if (combinedResults.length > 0) {
+      console.log("Sample combined data:", JSON.stringify(combinedResults[0], null, 2));
     }
 
-    // Check for the specific attendee mentioned (Kizzie Mason-Cokrell, ID 8318894)
-    const kizzieAttendee = attendeeResults.find(a => a.id === 8318894);
-    if (kizzieAttendee) {
-      const kizzieSeats = seatResults.filter(s => s.event_attendee_id === 8318894);
-      console.log(`\n*** Special check for Kizzie Mason-Cokrell (ID 8318894): ${kizzieSeats.length} seat(s) found`);
-      if (kizzieSeats.length > 0) {
-        kizzieSeats.forEach((seat, idx) => {
-          console.log(`  Seat ${idx + 1}:`, JSON.stringify(seat, null, 2));
-        });
-      }
-    } else {
-      console.log(`\n*** Kizzie Mason-Cokrell (ID 8318894) NOT in attendeeResults`);
-    }
-
-    // Combine the results - CREATE ONE ROW PER SEAT (not per attendee)
+    // Transform the combined results directly - they already have seats joined
     const results: Array<{
       first_name: string | null;
       last_name: string | null;
@@ -172,41 +134,21 @@ export async function GET(request: NextRequest) {
       seat_id: string | null;
       seat_obj: AttendeeRow['seat_obj'];
       checkin_timestamp: string | null;
-    }> = [];
+    }> = combinedResults.map(row => {
+      const eventInfo = eventResult.find(e => e.id === row.event_id);
+      return {
+        first_name: row.first_name,
+        last_name: row.last_name,
+        event_id: row.event_id,
+        event_start_at_formatted: eventInfo?.start_at_formatted || '-',
+        seat_id: row.seat_id,
+        seat_obj: row.seat_obj,
+        checkin_timestamp: row.checkin_timestamp,
+      };
+    });
 
-    for (const attendee of attendeeResults) {
-      const seats = seatResults.filter(s => s.event_attendee_id === attendee.id);
-      const eventInfo = eventResult.find(e => e.id === attendee.event_id);
-
-      if (seats.length === 0) {
-        // Attendee has no seats, show them with null seat info
-        results.push({
-          first_name: attendee.first_name,
-          last_name: attendee.last_name,
-          event_id: attendee.event_id,
-          event_start_at_formatted: eventInfo?.start_at_formatted || '-',
-          seat_id: null,
-          seat_obj: null,
-          checkin_timestamp: null,
-        });
-      } else {
-        // Create one row per seat
-        for (const seat of seats) {
-          results.push({
-            first_name: attendee.first_name,
-            last_name: attendee.last_name,
-            event_id: attendee.event_id,
-            event_start_at_formatted: eventInfo?.start_at_formatted || '-',
-            seat_id: seat.seat_id,
-            seat_obj: seat.seat_obj,
-            checkin_timestamp: seat.checkin_timestamp,
-          });
-        }
-      }
-    }
-
-    console.log(`\nCombined ${results.length} total rows (attendees × seats)`);
-    console.log('First 3 combined results:');
+    console.log(`\nTransformed ${results.length} total rows`);
+    console.log('First 3 results:');
     results.slice(0, 3).forEach((r, idx) => {
       console.log(`  Row ${idx + 1}: name="${r.first_name} ${r.last_name}", seat_id="${r.seat_id}"`);
     });
