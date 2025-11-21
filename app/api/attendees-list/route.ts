@@ -47,38 +47,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Step 2: Get all POLAR EXPRESS events (exclude parking) for the selected date
+    // Using EXISTS instead of JOIN+COUNT for much better performance
     console.log("Step 2: Finding POLAR EXPRESS events with attendees...");
     const eventQuery = `
-      SELECT DISTINCT
+      SELECT
         e.id,
         e.name,
         e.start_at,
-        to_char((e.start_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Chicago', 'MM/DD/YYYY, HH12:MI AM') as start_at_formatted,
-        COUNT(ea.id) as attendee_count
+        to_char((e.start_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Chicago', 'MM/DD/YYYY, HH12:MI AM') as start_at_formatted
       FROM events e
-      INNER JOIN event_attendees ea ON ea.event_id = e.id
       WHERE e.user_id = $1
-        AND ea.deleted_at IS NULL
         AND UPPER(e.name) LIKE '%POLAR EXPRESS%'
         AND UPPER(e.name) NOT LIKE '%PARKING%'
+        AND EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id = e.id AND ea.deleted_at IS NULL)
         ${dateParam ? "AND ((e.start_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Chicago')::date = $2::date" : ""}
-      GROUP BY e.id, e.name, e.start_at
-      HAVING COUNT(ea.id) > 0
       ORDER BY e.start_at DESC
     `;
 
     const eventParams = dateParam ? [HOST_USER_ID, dateParam] : [HOST_USER_ID];
-    const eventResult = await query<{ id: number; name: string; start_at: string; start_at_formatted: string; attendee_count: number }>(eventQuery, eventParams);
+    const eventResult = await query<{ id: number; name: string; start_at: string; start_at_formatted: string }>(eventQuery, eventParams);
     if (eventResult.length === 0) {
       console.log("No POLAR EXPRESS events with attendees found for this host");
       return NextResponse.json({ results: [], metadata: { hostUserId: HOST_USER_ID, total: 0 } });
     }
 
     const eventIds = eventResult.map(e => e.id);
-    const totalAttendees = eventResult.reduce((sum, e) => sum + e.attendee_count, 0);
-    console.log(`Step 2 COMPLETE - Found ${eventResult.length} POLAR EXPRESS event(s) with ${totalAttendees} total attendees`);
+    console.log(`Step 2 COMPLETE - Found ${eventResult.length} POLAR EXPRESS event(s)`);
     eventResult.forEach(e => {
-      console.log(`  - Event ${e.id}: "${e.name}" (${e.attendee_count} attendees)`);
+      console.log(`  - Event ${e.id}: "${e.name}"`);
     });
 
     // Step 3: Combine attendees and seats in a SINGLE query with JOIN
