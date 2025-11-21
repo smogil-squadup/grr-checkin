@@ -290,6 +290,16 @@ LIMIT 10000
 - Added LIMIT 10000 to prevent excessive results
 - Orders by event start_at DESC for most recent events first
 
+### ✅ Attendees Seat Join Timeout Safeguard
+- **Date**: 2025-11-21
+- **Description**: Prevented `/api/attendees-list` from timing out when the `attendee_guests` join exceeds the database `statement_timeout`
+- **Highlights**:
+  - Added detection for PostgreSQL error code `57014` and fall back to an attendee-only query when necessary
+  - Added per-event seat join retry to keep seat data whenever possible before degrading
+  - Logged fallback execution time to keep observability of long-running seat lookups
+  - Returned `seatAssignmentsIncluded` metadata so the UI (or logs) can detect whether seat data was included
+  - Centralized attendee queries into reusable helpers for easier tuning
+
 ## Future Enhancement Ideas
 
 ### 🔮 Potential Features
